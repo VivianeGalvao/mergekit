@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program. If not, see http://www.gnu.org/licenses/.
 
+import json
 import logging
 import os
 import time
@@ -351,13 +352,16 @@ def main(
                 population_size=force_population_size if force_population_size is not None else 10,
                 seed=random_seed
             )
+            start_time = time.time()
             xbest, fbest = de.run_DE()
+            end_time = time.time()
             xbest_cost = fbest
         elif opt_method == 'CMA-ES':
             print('Execuntando CMA-ES')
             cma_opts = {"maxfevals": max_fevals, "timeout": timeout, "seed": random_seed}
             if force_population_size is not None:
                 cma_opts["popsize"] = force_population_size
+            start_time = time.time()
             xbest, es = cma.fmin2(
                 None,
                 parallel_objective=parallel_evaluate,
@@ -366,6 +370,7 @@ def main(
                 options=cma_opts,
                 callback=progress_callback,
             )
+            end_time = time.time()
             xbest_cost = es.result.fbest
         elif opt_method == 'SaDE':
             print('Execuntando DE')
@@ -378,9 +383,12 @@ def main(
                 population_size=force_population_size if force_population_size is not None else 10,
                 seed=random_seed
             )
+            start_time = time.time()
             xbest, fbest = de.run_SaDE(learning_period=3)
+            end_time = time.time()
             xbest_cost = fbest
         else:
+            start_time = end_time = 0
             raise ValueError(f"Unknown optimization method {opt_method}")
     except KeyboardInterrupt:
         ray.shutdown()
@@ -397,6 +405,17 @@ def main(
     best_config = genome_pretty.genotype_merge_config(xbest)
     print("Best merge configuration:")
     print(best_config.to_yaml())
+
+    # save execution 
+    total_time = end_time - start_time
+    output = {}
+    output['total_time'] = total_time
+    output['best_cost'] = xbest_cost
+    output['seed'] = random_seed
+    output['method'] = opt_method
+    output['best_config'] = best_config
+    with open(f'{storage_path}/execution_time.json', 'w') as file:
+        json.dump(output, file)
 
     if save_final_model:
         print("Saving final model...")
