@@ -395,7 +395,6 @@ def main(
 
     print("!!! OPTIMIZATION COMPLETE !!!")
     print(f"Best cost: {xbest_cost:.4f}")
-    print()
 
     # pause for a bit to let any CUDA-using processes clean up
     time.sleep(1.0)
@@ -413,7 +412,8 @@ def main(
     output['best_cost'] = xbest_cost
     output['seed'] = random_seed
     output['method'] = opt_method
-    output['best_config'] = best_config
+    output['dimension'] = len(xbest)
+
     with open(f'{storage_path}/execution_time.json', 'w') as file:
         json.dump(output, file)
 
