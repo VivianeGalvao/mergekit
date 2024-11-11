@@ -48,7 +48,7 @@ def prep_sentiment_base(col):
 
 
 def main():
-    col='test'
+    col='validation'
 
     prep_sst2(col)
 
