@@ -43,6 +43,8 @@ class DE():
         self._population_size = population_size
         self._generations = generations
 
+        self.statistics = {}
+
         random.seed(self._seed)
     
     def _DE(self):
@@ -110,11 +112,9 @@ class DE():
                         self._best_f = mut_min
                         self._best = pop_mutation[i]
 
-        pd.DataFrame({'best': bests}).to_csv(f'{ROOT}/DE_bests_{self._seed}.csv', index=False)
-        pd.DataFrame({'pop_mean': pop_mean}).to_csv(f'{ROOT}/DE_popmean_{self._seed}.csv', index=False)
-        pd.DataFrame({'pop_median': pop_median}).to_csv(f'{ROOT}/DE_popmedian_{self._seed}.csv', index=False)
+        self.statistics = {'best': bests, 'pop_mean': pop_mean, 'pop_median': pop_median}
 
-        return self._best, self._best_f
+        return self._best, self._best_f, self.statistics
     
     def _get_probability_strategy(self, m_success, m_fail, G, lp, k=4):
         if G >= lp:
@@ -315,11 +315,9 @@ class DE():
 
             generation+=1
 
-        pd.DataFrame({'best': bests}).to_csv(f'{ROOT}/SaDE_bests_{self._seed}.csv', index=False)
-        pd.DataFrame({'pop_mean': pop_mean}).to_csv(f'{ROOT}/SaDE_popmean_{self._seed}.csv', index=False)
-        pd.DataFrame({'pop_median': pop_median}).to_csv(f'{ROOT}/SaDE_popmedian_{self._seed}.csv', index=False)
+        self.statistics = {'best': bests, 'pop_mean': pop_mean, 'pop_median': pop_median}
 
-        return self._best, self._best_f
+        return self._best, self._best_f, self.statistics
 
     def run_DE(self):
 
