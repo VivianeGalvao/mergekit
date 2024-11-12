@@ -185,8 +185,8 @@ def main(
         run = None
 
     merge_options = MergeOptions(
-        transformers_cache=os.path.join(storage_path, "transformers_cache"),
-        lora_merge_cache=os.path.join(storage_path, "lora_merge_cache"),
+        transformers_cache=os.path.join("mergekit", "transformers_cache"),
+        lora_merge_cache=os.path.join("mergekit", "lora_merge_cache"),
         cuda=merge_cuda,
         low_cpu_memory=merge_cuda and not in_memory,
         out_shard_size=1_000_000_000_000,  # one trillion bytes!
@@ -207,7 +207,7 @@ def main(
             resharded_models.append(
                 _reshard_model(
                     model,
-                    storage_path,
+                    "mergekit",
                     merge_options.lora_merge_cache,
                     trust_remote_code,
                 )
@@ -215,7 +215,7 @@ def main(
         if config.genome.base_model is not None:
             resharded_base = _reshard_model(
                 config.genome.base_model,
-                storage_path,
+                "mergekit",
                 merge_options.lora_merge_cache,
                 trust_remote_code,
             )
@@ -255,7 +255,7 @@ def main(
         num_gpus=num_gpus,
         vllm=vllm,
         in_memory=in_memory,
-        model_storage_path=os.path.join(storage_path, "merged"),
+        model_storage_path=os.path.join("mergekit", "merged"),
         batch_size=batch_size,
         task_search_path=task_search_path,
     )
@@ -288,13 +288,13 @@ def main(
             xbest_cost = res.fbest
             print(f"New best score: {-xbest_cost:.4f}")
             best_yaml = genome.genotype_merge_config(xbest).to_yaml()
-            with open(os.path.join(storage_path, "best_config.yaml"), "w") as f:
+            with open(os.path.join("mergekit/merged", "best_config.yaml"), "w") as f:
                 f.write(best_yaml)
             print(f"Merge configuration:\n{best_yaml}")
 
             if use_wandb:
                 art = wandb.Artifact("best_config", type="merge_config")
-                art.add_file(os.path.join(storage_path, "best_config.yaml"))
+                art.add_file(os.path.join("mergekit/merged", "best_config.yaml"))
                 run.log_artifact(art)
 
     def parallel_evaluate(x: List[np.ndarray]) -> List[float]:
