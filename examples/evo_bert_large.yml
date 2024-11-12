@@ -5,13 +5,14 @@ genome:
        - danielribeiro/google-play-sentiment-analysis
        - DrishtiSharma/bert-large-uncased-Hate_Offensive_or_Normal_Speech
        - CeciliaS/bert-large-uncased-Twitter-toxicity
-       - jalaluddin94/baseline_nli_bert-large
        - Sreenington/BERT-Ecommerce-Classification
-       - Narkantak/Intent-classification-BERT-Large-Ashu
-       - hoanganhvu/bert-large-finetuned-phishing
-       - Junginkim/bert-large-finetuned-phishing
        - harrumnoor/scam-detection
        - ealvaradob/bert-finetuned-phishing
+      #  - Narkantak/Intent-classification-BERT-Large-Ashu
+      #  - hoanganhvu/bert-large-finetuned-phishing
+      #  - Junginkim/bert-large-finetuned-phishing
+      #  - jalaluddin94/baseline_nli_bert-large
+
     merge_method: dare_ties
     base_model:
         model: neuralmind/bert-large-portuguese-cased

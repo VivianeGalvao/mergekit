@@ -353,7 +353,7 @@ def main(
                 seed=random_seed
             )
             start_time = time.time()
-            xbest, fbest = de.run_DE()
+            xbest, fbest, statistics = de.run_DE()
             end_time = time.time()
             xbest_cost = fbest
         elif opt_method == 'CMA-ES':
@@ -384,7 +384,7 @@ def main(
                 seed=random_seed
             )
             start_time = time.time()
-            xbest, fbest = de.run_SaDE(learning_period=3)
+            xbest, fbest, statistics = de.run_SaDE(learning_period=3)
             end_time = time.time()
             xbest_cost = fbest
         else:
@@ -413,13 +413,18 @@ def main(
     output['seed'] = random_seed
     output['method'] = opt_method
     output['dimension'] = len(xbest)
+    output['statistics'] = statistics
 
     with open(f'{storage_path}/execution_time.json', 'w') as file:
         json.dump(output, file)
 
     if save_final_model:
         print("Saving final model...")
-        run_merge(best_config, os.path.join(storage_path, "final_model"), merge_options)
+        # run_merge(best_config, os.path.join(storage_path, "final_model"), merge_options)
+        with open(
+            os.path.join(storage_path, "mergekit_config.yml"), "w", encoding="utf-8"
+        ) as fp:
+            fp.write(best_config.to_yaml())
 
 
 def _reshard_model(
