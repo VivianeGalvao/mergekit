@@ -1,13 +1,12 @@
-
-t='./experimentos_v1/de_merged/merge'
+t='drive/MyDrive/artigo_vivi/resultados/de_merged'
+mkdir $t
 for i in $(seq 1 5);
 do
-    # rm -rf /tmp/ray/session_*
-    dir=$t"_"$i
+    dir=$t"/merge_"$i
     mkdir $dir
     echo $dir
 
-    mergekit-evolve --batch-size 1 \
+    mergekit-evolve --batch-size 10 \
                     --no-in-memory \
                     --allow-crimes \
                     --no-reshard \
@@ -17,7 +16,6 @@ do
                     --storage-path $dir \
                     --force-population-size 10\
                     --max-fevals 500 \
-                    ./examples/evo_bert.yml
+                    mergekit/examples/evo_bert_large.yml
 
-    rm -rf $dir"/transformers_cache/"
 done

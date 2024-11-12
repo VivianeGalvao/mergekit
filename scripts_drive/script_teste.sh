@@ -1,11 +1,11 @@
-
-t='experimentos_v1/cmaes_merged/merge'
+t='drive/MyDrive/artigo_vivi/resultados/sade_merged'
+mkdir $t
 i=1
-dir=$t"_"$i
+dir=$t"/merge_"$i
 mkdir $dir
-echo $dir
 
-mergekit-evolve --batch-size 1 \
+
+mergekit-evolve --batch-size 5 \
                 --no-in-memory \
                 --allow-crimes \
                 --no-reshard \
@@ -13,9 +13,6 @@ mergekit-evolve --batch-size 1 \
                 --opt_method SaDE \
                 --random-seed $i \
                 --storage-path $dir \
-                --force-population-size 10\
-                --max-fevals 500 \
-                examples/evo_bert.yml
-
-rm -rf $dir"/transformers_cache/"
-done
+                --force-population-size 5\
+                --max-fevals 5 \
+                mergekit/examples/evo_bert_large.yml

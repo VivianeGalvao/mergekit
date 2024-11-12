@@ -11,7 +11,7 @@ def eval_task(pipe, task):
 
     if task == 'sentiment_pt':
         targets=['positivo', 'negativo']
-        data_val = load_dataset('csv', data_files='data/maritaca-ai_sst2_pt.csv')
+        data_val = load_dataset('csv', data_files='mergekit/data/maritaca-ai_sst2_pt.csv')
         tokenizer_kwargs = {"truncation": True, "max_length":512}
         vals = data_val['train'].map(
             lambda x: pipe(
@@ -55,7 +55,6 @@ def fillmask_evaluator(
     tokenizer = AutoTokenizer.from_pretrained(
         merged_path,
         do_lower_case=False,
-        truncation_side='left'
     )
 
     fill_mask = pipeline(
