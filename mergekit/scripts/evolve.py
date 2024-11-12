@@ -353,7 +353,7 @@ def main(
                 seed=random_seed
             )
             start_time = time.time()
-            xbest, fbest = de.run_DE()
+            xbest, fbest, statistics = de.run_DE()
             end_time = time.time()
             xbest_cost = fbest
         elif opt_method == 'CMA-ES':
@@ -384,7 +384,7 @@ def main(
                 seed=random_seed
             )
             start_time = time.time()
-            xbest, fbest = de.run_SaDE(learning_period=3)
+            xbest, fbest, statistics = de.run_SaDE(learning_period=3)
             end_time = time.time()
             xbest_cost = fbest
         else:
@@ -413,6 +413,7 @@ def main(
     output['seed'] = random_seed
     output['method'] = opt_method
     output['dimension'] = len(xbest)
+    output['statistics'] = statistics
 
     with open(f'{storage_path}/execution_time.json', 'w') as file:
         json.dump(output, file)
