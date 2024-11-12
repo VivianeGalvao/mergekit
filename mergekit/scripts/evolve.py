@@ -420,7 +420,11 @@ def main(
 
     if save_final_model:
         print("Saving final model...")
-        run_merge(best_config, os.path.join(storage_path, "final_model"), merge_options)
+        # run_merge(best_config, os.path.join(storage_path, "final_model"), merge_options)
+        with open(
+            os.path.join(storage_path, "mergekit_config.yml"), "w", encoding="utf-8"
+        ) as fp:
+            fp.write(best_config.to_yaml())
 
 
 def _reshard_model(
