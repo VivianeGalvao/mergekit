@@ -51,6 +51,15 @@ def fillmask_evaluator(
         merged_path,
         task
 ):
+    
+    # getting the BertMLM layer from base model
+    tokenizer = AutoTokenizer.from_pretrained('neuralmind/bert-large-portuguese-cased', do_lower_case=False)
+    pipe = pipeline(
+            task="fill-mask",
+            model='neuralmind/bert-large-portuguese-cased',
+            tokenizer=tokenizer,
+            device='cuda'
+        )
 
     tokenizer = AutoTokenizer.from_pretrained(
         merged_path,
@@ -63,6 +72,8 @@ def fillmask_evaluator(
         tokenizer=tokenizer,
         device='cuda'
     )
-    print(fill_mask.tokenizer)
+    fill_mask.model.cls = pipe.model.cls
+
+    del pipe
 
     return eval_task(fill_mask, task)
