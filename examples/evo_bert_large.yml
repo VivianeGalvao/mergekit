@@ -2,7 +2,7 @@ genome:
     models:
        - Nelci/bertimbau_hate_speech
        - Silly-Machine/TuPy-Bert-Large-Binary-Classifier
-       - danielribeiro/google-play-sentiment-analysis
+      #  - danielribeiro/google-play-sentiment-analysis
        - DrishtiSharma/bert-large-uncased-Hate_Offensive_or_Normal_Speech
        - CeciliaS/bert-large-uncased-Twitter-toxicity
        - Sreenington/BERT-Ecommerce-Classification
@@ -15,14 +15,14 @@ genome:
 
     merge_method: dare_ties
     base_model:
-        model: neuralmind/bert-large-portuguese-cased
+        model: danielribeiro/google-play-sentiment-analysis #neuralmind/bert-large-portuguese-cased
         override_architecture: BertModel
     tokenizer_source: null # optional
     layer_granularity: 0
 
     # optional:
     normalize: false
-    allow_negative_weights: false
+    allow_negative_weights: true
     smooth: false
 
 tasks:
