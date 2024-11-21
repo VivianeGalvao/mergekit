@@ -82,13 +82,58 @@ def eval_task(pipe, task):
 
         results = {
             'sentiment_pt': {
-                'score': f1,
+                'score': f1*100,
                 'f1-score': f1,
                 'accuracy': acc,
             }
         }
 
-    return results
+        return results
+
+    if task == 'hatebr':
+
+        model_name = "Silly-Machine/TuPy-Bert-Large-Binary-Classifier"
+
+        model = BertForSequenceClassification.from_pretrained(model_name)
+
+        # freeze classification layer from base model
+        pipe.model.classifier = model.classifier.to('cuda')
+        pipe.model.config.id2label = model.config.id2label
+
+        tokenizer_kwargs = {
+            'padding':True,
+            'truncation':True,
+            'max_length':512
+        }
+
+        data_val = load_dataset('csv', data_files='mergekit/data/hatebr.csv')
+        vals = data_val['train'].map(
+            lambda x: pipe(x['text'], **tokenizer_kwargs)[0]
+        )
+
+        df = pd.DataFrame(vals)
+        df['model_label'] = df['label'].replace('hate', True).replace('not hate', False)
+
+        f1 = f1_score(
+            df['true_label'],
+            df['model_label'],
+            average='binary'
+        )
+
+        acc = accuracy_score(
+            df['true_label'],
+            df['model_label'],
+        )
+
+        results = {
+            'hatebr': {
+                'score': f1*100,
+                'f1-score': f1,
+                'accuracy': acc,
+            }
+        }
+
+        return results
 
 
 def fillmask_evaluator(
