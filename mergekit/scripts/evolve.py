@@ -372,6 +372,7 @@ def main(
             )
             end_time = time.time()
             xbest_cost = es.result.fbest
+            statistics = []
         elif opt_method == 'SaDE':
             print('Execuntando DE')
             print(f'Caminho output: {storage_path}')

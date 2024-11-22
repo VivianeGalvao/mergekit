@@ -1,5 +1,23 @@
+import emoji
 import pandas as pd
 from datasets import load_dataset
+
+
+def remove_emojis(text):
+    return emoji.replace_emoji(text, replace='')
+
+
+def prep_hatebr(col):
+
+    ds = load_dataset("ruanchaves/hatebr")
+    ds = ds[col].rename_column('offensive_language', 'true_label')
+    df = pd.DataFrame(data=ds)
+    # filter only offensive and hate speech
+    df = df[df['offensive_&_non-hate_speech'] == False]
+    df['text'] = df['instagram_comments'].apply(
+        lambda x: remove_emojis(x)
+    ).str.replace('\s+', ' ', regex=True)
+    df.to_csv('data/hatebr.csv', index=False)
 
 
 def prep_sst2(col):
@@ -49,7 +67,7 @@ def prep_sentiment_base(col):
 
 def main():
     col='validation'
-
     prep_sst2(col)
+    prep_hatebr(col)
 
 main()
