@@ -7,7 +7,7 @@ from transformers import AutoTokenizer, pipeline, BertForSequenceClassification,
 from datasets import load_dataset
 
 
-BATCH_SIZE = 8
+BATCH_SIZE = 512
 
 
 def eval_task(pipe, task):
