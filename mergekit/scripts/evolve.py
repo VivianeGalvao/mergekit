@@ -347,7 +347,7 @@ def main(
             de = DE(
                 fct=parallel_evaluate,
                 D_x=len(x0),
-                lb=0, ub=1,
+                lb=0.01, ub=1,
                 max_fevals=max_fevals,
                 population_size=force_population_size if force_population_size is not None else 10,
                 seed=random_seed
@@ -358,7 +358,12 @@ def main(
             xbest_cost = fbest
         elif opt_method == 'CMA-ES':
             print('Execuntando CMA-ES')
-            cma_opts = {"maxfevals": max_fevals, "timeout": timeout, "seed": random_seed}
+            cma_opts = {
+                "maxfevals": max_fevals,
+                "timeout": timeout,
+                "seed": random_seed,
+                "bounds": [0.01, 1] 
+            }
             if force_population_size is not None:
                 cma_opts["popsize"] = force_population_size
             start_time = time.time()
@@ -379,7 +384,7 @@ def main(
             de = DE(
                 fct=parallel_evaluate,
                 D_x=len(x0),
-                lb=0, ub=1,
+                lb=0.01, ub=1,
                 max_fevals=max_fevals,
                 population_size=force_population_size if force_population_size is not None else 10,
                 seed=random_seed

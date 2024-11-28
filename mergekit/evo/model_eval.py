@@ -7,6 +7,9 @@ from transformers import AutoTokenizer, pipeline, BertForSequenceClassification,
 from datasets import load_dataset
 
 
+BATCH_SIZE = 8
+
+
 def eval_task(pipe, task):
 
     if task == 'fillmask_sentiment_pt':
@@ -63,10 +66,11 @@ def eval_task(pipe, task):
         }
 
         data_val = load_dataset('csv', data_files='mergekit/data/maritaca-ai_sst2_pt.csv')
-        vals = data_val['train'].map(
-            lambda x: pipe(x['text'], **tokenizer_kwargs)[0]
-        )
+
+        vals = pipe(data_val['train']['text'], batch_size=BATCH_SIZE, **tokenizer_kwargs)
         df = pd.DataFrame(vals)
+        df = pd.concat([pd.DataFrame(data_val['train']), df], axis=1)
+        
         df['model_label'] = df['label'].replace('Positivo', 1).replace('Negativo', 0).replace('Neutro', -1)
 
         f1 = f1_score(
@@ -107,11 +111,10 @@ def eval_task(pipe, task):
         }
 
         data_val = load_dataset('csv', data_files='mergekit/data/hatebr.csv')
-        vals = data_val['train'].map(
-            lambda x: pipe(x['text'], **tokenizer_kwargs)[0]
-        )
 
+        vals = pipe(data_val['train']['text'], batch_size=BATCH_SIZE, **tokenizer_kwargs)
         df = pd.DataFrame(vals)
+        df = pd.concat([pd.DataFrame(data_val['train']), df], axis=1)
         df['model_label'] = df['label'].replace('hate', True).replace('not hate', False)
 
         f1 = f1_score(
