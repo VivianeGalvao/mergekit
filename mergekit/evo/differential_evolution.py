@@ -204,7 +204,6 @@ class DE():
         prob_strategy = []
         strategy_success = []
         strategy_fail = []
-        learning_period = 2
         F = []
         strategies = [
             'DE/rand/1/bin',
