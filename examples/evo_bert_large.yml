@@ -3,17 +3,17 @@ genome:
        - Nelci/bertimbau_hate_speech
        - Silly-Machine/TuPy-Bert-Large-Binary-Classifier
        - danielribeiro/google-play-sentiment-analysis
-       - DrishtiSharma/bert-large-uncased-Hate_Offensive_or_Normal_Speech
-       - CeciliaS/bert-large-uncased-Twitter-toxicity
-       - Sreenington/BERT-Ecommerce-Classification
-       - harrumnoor/scam-detection
-       - ealvaradob/bert-finetuned-phishing
+      #  - DrishtiSharma/bert-large-uncased-Hate_Offensive_or_Normal_Speech
+      #  - CeciliaS/bert-large-uncased-Twitter-toxicity
+      #  - Sreenington/BERT-Ecommerce-Classification
+      #  - harrumnoor/scam-detection
+      #  - ealvaradob/bert-finetuned-phishing
       #  - Narkantak/Intent-classification-BERT-Large-Ashu
       #  - hoanganhvu/bert-large-finetuned-phishing
       #  - Junginkim/bert-large-finetuned-phishing
       #  - jalaluddin94/baseline_nli_bert-large
 
-    merge_method: dare_ties
+    merge_method: ties
     base_model:
         model: neuralmind/bert-large-portuguese-cased
         override_architecture: BertModel
@@ -22,10 +22,13 @@ genome:
 
     # optional:
     normalize: false
-    allow_negative_weights: false
+    allow_negative_weights: true
     smooth: false
 
 tasks:
   - name: sentiment_pt
+    weight: 1.0 # optional
+    metric: "acc,none" # defaults to acc,none
+  - name: hatebr
     weight: 1.0 # optional
     metric: "acc,none" # defaults to acc,none

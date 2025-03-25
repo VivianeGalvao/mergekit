@@ -3,13 +3,16 @@ import pandas as pd
 import numpy as np
 
 from sklearn.metrics import f1_score, accuracy_score
-from transformers import AutoTokenizer, pipeline 
+from transformers import AutoTokenizer, pipeline, BertForSequenceClassification, AutoConfig
 from datasets import load_dataset
+
+
+BATCH_SIZE = 512
 
 
 def eval_task(pipe, task):
 
-    if task == 'sentiment_pt':
+    if task == 'fillmask_sentiment_pt':
         targets=['positivo', 'negativo']
         data_val = load_dataset('csv', data_files='mergekit/data/maritaca-ai_sst2_pt.csv')
         tokenizer_kwargs = {"truncation": True, "max_length":512}
@@ -23,7 +26,7 @@ def eval_task(pipe, task):
         )
         df = pd.DataFrame(vals)
 
-        score = df['score'].mean()*1000
+        score = df['score'].mean()
         f1 = f1_score(
             df['sentiment'].replace('positivo', 1).replace('negativo', 0), 
             df['token_str'].replace('positivo', 1).replace('negativo', 0), 
@@ -45,12 +48,110 @@ def eval_task(pipe, task):
         }
 
         return results
+    
+    if task == 'sentiment_pt':
+
+        model_name = "danielribeiro/google-play-sentiment-analysis"
+
+        model = BertForSequenceClassification.from_pretrained(model_name)
+
+        # freeze classification layer from base model
+        pipe.model.classifier = model.classifier.to('cuda')
+        pipe.model.config.id2label = model.config.id2label
+
+        tokenizer_kwargs = {
+            'padding':True,
+            'truncation':True,
+            'max_length':512
+        }
+
+        data_val = load_dataset('csv', data_files='mergekit/data/maritaca-ai_sst2_pt.csv')
+
+        vals = pipe(data_val['train']['text'], batch_size=BATCH_SIZE, **tokenizer_kwargs)
+        df = pd.DataFrame(vals)
+        df = pd.concat([pd.DataFrame(data_val['train']), df], axis=1)
+        
+        df['model_label'] = df['label'].replace('Positivo', 1).replace('Negativo', 0).replace('Neutro', -1)
+
+        f1 = f1_score(
+            df[df['label']!='Neutro']['true_label'],
+            df[df['label']!='Neutro']['model_label'],
+            average='binary'
+        )
+
+        acc = accuracy_score(
+            df[df['label']!='Neutro']['true_label'],
+            df[df['label']!='Neutro']['model_label'],
+        )
+
+        results = {
+            'sentiment_pt': {
+                'score': f1*100,
+                'f1-score': f1,
+                'accuracy': acc,
+            }
+        }
+
+        return results
+
+    if task == 'hatebr':
+
+        model_name = "Silly-Machine/TuPy-Bert-Large-Binary-Classifier"
+
+        model = BertForSequenceClassification.from_pretrained(model_name)
+
+        # freeze classification layer from base model
+        pipe.model.classifier = model.classifier.to('cuda')
+        pipe.model.config.id2label = model.config.id2label
+
+        tokenizer_kwargs = {
+            'padding':True,
+            'truncation':True,
+            'max_length':512
+        }
+
+        data_val = load_dataset('csv', data_files='mergekit/data/hatebr.csv')
+
+        vals = pipe(data_val['train']['text'], batch_size=BATCH_SIZE, **tokenizer_kwargs)
+        df = pd.DataFrame(vals)
+        df = pd.concat([pd.DataFrame(data_val['train']), df], axis=1)
+        df['model_label'] = df['label'].replace('hate', True).replace('not hate', False)
+
+        f1 = f1_score(
+            df['true_label'],
+            df['model_label'],
+            average='binary'
+        )
+
+        acc = accuracy_score(
+            df['true_label'],
+            df['model_label'],
+        )
+
+        results = {
+            'hatebr': {
+                'score': f1*100,
+                'f1-score': f1,
+                'accuracy': acc,
+            }
+        }
+
+        return results
 
 
 def fillmask_evaluator(
         merged_path,
         task
 ):
+    
+    # getting the BertMLM layer from base model
+    tokenizer = AutoTokenizer.from_pretrained('neuralmind/bert-large-portuguese-cased', do_lower_case=False)
+    pipe = pipeline(
+            task="fill-mask",
+            model='neuralmind/bert-large-portuguese-cased',
+            tokenizer=tokenizer,
+            device='cuda'
+        )
 
     tokenizer = AutoTokenizer.from_pretrained(
         merged_path,
@@ -63,6 +164,26 @@ def fillmask_evaluator(
         tokenizer=tokenizer,
         device='cuda'
     )
-    print(fill_mask.tokenizer)
+    fill_mask.model.cls = pipe.model.cls
+
+    del pipe
 
     return eval_task(fill_mask, task)
+
+def classification_evaluator(
+        merged_path,
+        task
+):
+    
+    print(f'Avaliando modelo {merged_path}')
+    
+    pipe = pipeline(
+        "text-classification", 
+        model=merged_path,
+        tokenizer=merged_path,
+        device='cuda',
+        truncation=True
+    )
+
+    return eval_task(pipe, task)
+    

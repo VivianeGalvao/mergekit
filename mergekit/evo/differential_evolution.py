@@ -46,6 +46,14 @@ class DE():
         self.statistics = {}
 
         random.seed(self._seed)
+
+    def box_constraints(self, mut):
+        for j in range(self._D_x):
+            if mut[j] < self._lb: 
+                mut[j] = self._lb
+            if mut[j] > self._ub: 
+                mut[j] = self._ub
+        return mut
     
     def _DE(self):
 
@@ -65,13 +73,13 @@ class DE():
             if fpop[i] < self._best_f:
                 self._best_f = fpop[i]
                 self._best = popx[i]
+        
+        bests.append(self._best_f)
+        pop_mean.append(np.mean(fpop))
+        pop_median.append(np.median(fpop))
 
         t = self._population_size
         while t < self._max_fevals:
-
-            bests.append(self._best_f)
-            pop_mean.append(np.mean(popx))
-            pop_median.append(np.median(popx))
             
             pop_mutation = np.zeros((self._population_size, self._D_x))
             
@@ -80,19 +88,10 @@ class DE():
                 
                 #mutacao
                 pop_mutation[i] = np.asarray(popx[gamma]) + self._F*(np.asarray(popx[alpha]) - np.asarray(popx[beta]))
-                
-                #for m in pop_mutation[i]:
-                #    if m < 0: m = 0
-                #    if m > 1: m = 1
 
-                for j in range(self._D_x):
-                    if pop_mutation[i][j] < self._lb: 
-                        pop_mutation[i][j] = 0
-                    if pop_mutation[i][j] > self._ub: 
-                        pop_mutation[i][j] = 1
+                pop_mutation[i] = self.box_constraints(pop_mutation[i])
                 
-            #cruzamento
-            for i in range(self._population_size):
+                #cruzamento
                 for j in range(self._D_x):
                     rand = random.random()
                     if rand > self._Cr:
@@ -111,6 +110,10 @@ class DE():
                     if mut_min < self._best_f:
                         self._best_f = mut_min
                         self._best = pop_mutation[i]
+
+            bests.append(self._best_f)
+            pop_mean.append(np.mean(fpop))
+            pop_median.append(np.median(fpop))
 
         self.statistics = {'best': bests, 'pop_mean': pop_mean, 'pop_median': pop_median}
 
@@ -201,7 +204,6 @@ class DE():
         prob_strategy = []
         strategy_success = []
         strategy_fail = []
-        learning_period = 2
         F = []
         strategies = [
             'DE/rand/1/bin',
@@ -224,13 +226,13 @@ class DE():
             if fpop[i] < self._best_f:
                 self._best_f = fpop[i]
                 self._best = popx[i]
+        
+        bests.append(self._best_f)
+        pop_mean.append(np.mean(fpop))
+        pop_median.append(np.median(fpop))
 
         t = self._population_size
         while t < self._max_fevals:
-
-            bests.append(self._best_f)
-            pop_mean.append(np.mean(popx))
-            pop_median.append(np.median(popx))
 
             chosen_strategies = []
 
@@ -275,15 +277,10 @@ class DE():
                 )
                 chosen_strategies.append(strat)
 
-                for j in range(self._D_x):
-                    if pop_mutation[i][j] < self._lb: 
-                        pop_mutation[i][j] = 0
-                    if pop_mutation[i][j] > self._ub: 
-                        pop_mutation[i][j] = 1
+                pop_mutation[i] = self.box_constraints(pop_mutation[i])
             
-            #cruzamento
-            for i in range(self._population_size):
-                strat = chosen_strategies[i] - 1
+                #cruzamento
+                strat = strat - 1
                 for j in range(self._D_x):
                     rand = random.random()
                     if rand > CR[generation][strat][i]:
@@ -314,6 +311,10 @@ class DE():
             strategy_fail.append(fail)
 
             generation+=1
+
+            bests.append(self._best_f)
+            pop_mean.append(np.mean(fpop))
+            pop_median.append(np.median(fpop))
 
         self.statistics = {'best': bests, 'pop_mean': pop_mean, 'pop_median': pop_median}
 
