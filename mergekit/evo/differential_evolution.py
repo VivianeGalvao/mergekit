@@ -192,7 +192,7 @@ class DE():
 
     def _SaDE(self, learning_period):
 
-        learning_period = (self._max_fevals / self._population_size)*0.2
+        learning_period = int((self._max_fevals / self._population_size)*0.2)
 
         bests = []
         pop_mean = []
@@ -239,7 +239,7 @@ class DE():
             F.append([np.random.normal(0.5, 0.3) for _ in range(n_strategies)])
             
             # calculate prob
-            if generation > learning_period:
+            if generation >= learning_period:
                 p = self._get_probability_strategy(
                     strategy_success,
                     strategy_fail,
