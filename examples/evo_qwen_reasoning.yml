@@ -1,0 +1,21 @@
+genome:
+    models:
+       - alpha-ai/qwen2.5-reason-thought-lite
+       - Spestly/Athena-1-3B
+       - prithivMLmods/QwQ-LCoT-3B-Instruct
+
+    merge_method: ties
+    base_model:
+        model: Qwen/Qwen2.5-3B-Instruct
+    tokenizer_source: null # optional
+    layer_granularity: 0
+
+    # optional:
+    normalize: false
+    allow_negative_weights: true
+    smooth: false
+
+tasks:
+  - name: reasoning_python
+    weight: 1.0 # optional
+    metric: "acc,none" # defaults to acc,none
