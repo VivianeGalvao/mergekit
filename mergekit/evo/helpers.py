@@ -23,28 +23,49 @@ from mergekit.merge import run_merge
 from mergekit.options import MergeOptions
 
 
-def _eval_model(
-    model: Union[str, lm_eval.api.model.LM],
-    tasks: List[TaskConfiguration],
-    model_args: Optional[Dict[str, Any]] = None,
-    task_manager: Optional[lm_eval.tasks.TaskManager] = None,
-    **kwargs,
-) -> Dict[str, Any]:
-    results = lm_eval.simple_evaluate(
-        model=model,
-        model_args=model_args,
-        tasks=list(set([task.name for task in tasks])),
-        log_samples=False,
-        verbosity="WARNING",
-        task_manager=task_manager,
-        **kwargs,
-    )
+from mergekit.evo.model_eval import evaluate_math_model
 
-    logging.info(results["results"])
-    res = 0
+
+# def _eval_model(
+#     model: Union[str, lm_eval.api.model.LM],
+#     tasks: List[TaskConfiguration],
+#     model_args: Optional[Dict[str, Any]] = None,
+#     task_manager: Optional[lm_eval.tasks.TaskManager] = None,
+#     **kwargs,
+# ) -> Dict[str, Any]:
+#     results = lm_eval.simple_evaluate(
+#         model=model,
+#         model_args=model_args,
+#         tasks=list(set([task.name for task in tasks])),
+#         log_samples=False,
+#         verbosity="WARNING",
+#         task_manager=task_manager,
+#         **kwargs,
+#     )
+
+#     logging.info(results["results"])
+#     res = 0
+#     for task in tasks:
+#         res += results["results"][task.name][task.metric] * task.weight
+#     return {"score": res, "results": results["results"]}
+
+def _eval_model(
+    merged_path: str,
+    tasks: List[TaskConfiguration]
+) -> Dict[str, Any]:
+
+    results = {}
+    score = 0
+
     for task in tasks:
-        res += results["results"][task.name][task.metric] * task.weight
-    return {"score": res, "results": results["results"]}
+        task_name = task.name
+        res = evaluate_math_model(
+            merged_path=merged_path
+        )
+        results.update(res)
+        score+=res[task_name]['score']
+
+    return {"score": score, "results": results}
 
 
 def evaluate_model(
