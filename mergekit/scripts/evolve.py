@@ -38,6 +38,7 @@ from mergekit.evo.strategy import (
 from mergekit.merge import run_merge
 from mergekit.options import MergeOptions
 
+ray.init(_temp_dir="/tmp/ray")
 
 @click.command("mergekit-evolve")
 @click.argument("genome-config-path", type=str)

@@ -47,7 +47,7 @@ def score_math_problem(code_string: str, ground_truth_answer: float, tolerance=1
 
         error_message = f"{type(e).__name__} on line {line_number}: {str(e)}"
         is_executable = False
-        difference = np.inf
+        difference = ground_truth_answer
 
     return {
         "is_executable": is_executable,
@@ -183,7 +183,8 @@ def evaluate_math_model(model_id: str) -> dict:
         generated_ids = model.generate(
             **model_inputs,
             max_new_tokens=512,
-            temperature=0.0,
+            do_sample=True,
+            temperature=1.0,
             pad_token_id=tokenizer.pad_token_id
         )
 
@@ -200,12 +201,13 @@ def evaluate_math_model(model_id: str) -> dict:
             score = score_math_problem(code_snippet, float(true_answer))
             total_score += score['difference']
         else:
+            total_score += float(true_answer)
             print("No code block found.")
 
     final_accuracy = total_score / len(problems) if problems else 0
     return {
         'reasoning_python': {
-            'score': total_score,
+            'score': -total_score,
             'accuracy': final_accuracy
         }
     }

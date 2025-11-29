@@ -49,9 +49,13 @@ from mergekit.evo.model_eval import evaluate_math_model
 #         res += results["results"][task.name][task.metric] * task.weight
 #     return {"score": res, "results": results["results"]}
 
+
 def _eval_model(
     merged_path: str,
-    tasks: List[TaskConfiguration]
+    tasks: List[TaskConfiguration],
+    model_args: Optional[Dict[str, Any]] = None,
+    task_manager: Optional[lm_eval.tasks.TaskManager] = None,
+    **kwargs,
 ) -> Dict[str, Any]:
 
     results = {}
@@ -96,7 +100,7 @@ def evaluate_model(
             model_args["use_cache"] = True
 
         res = _eval_model(
-            "vllm" if vllm else "huggingface",
+            merged_path,
             tasks,
             model_args,
             num_fewshot=num_fewshot,
