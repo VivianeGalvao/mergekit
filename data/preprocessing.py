@@ -69,5 +69,5 @@ if __name__ == "__main__":
     df_validation, df_test = process_gsm8k()
 
     # Opcional: Salvar em CSV/JSONL para usar depois
-    df_validation.to_csv("gsm8k_validation.csv", index=False)
-    df_test.to_csv("gsm8k_test.csv", index=False)
+    df_validation.to_csv("data/gsm8k_validation.csv", index=False)
+    df_test.to_csv("data/gsm8k_test.csv", index=False)

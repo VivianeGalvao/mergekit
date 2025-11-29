@@ -6,6 +6,7 @@ import math
 import sys
 import traceback
 import numpy as np
+import pandas as pd
 
 from contextlib import redirect_stdout
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -58,16 +59,11 @@ def score_math_problem(code_string: str, ground_truth_answer: float, tolerance=1
 
 
 def get_data():
-    problems = [
-        "The coordinates of a parallelogram are (5, 3), (6, 8), (7, 4) and (x, y) and x > 7. What is the valueof x + y",
-        "The coordinates of a parallelogram are (5, 3), (6, 8), (7, 4) and (x, y) and x > 7. What is the valueof x + y"
-    ]
-    answers = [
-        "16",
-        "16"
-    ]
 
-    return problems, answers
+    df = pd.read_csv("mergekit/data/gsm8k_preprocessed.csv").sample(frac=0.2, random_state=42).reset_index(drop=True)
+
+    return df['problem'].tolist(), df['final_answer'].tolist()
+
 
 def get_prompt(input: str) -> str:
     prompt = f"""
@@ -83,7 +79,7 @@ def get_prompt(input: str) -> str:
           Question: the input question
           <code>Construct the code step by step. Use <end_of_step> to indicate the end of each step.
           Ensure your code can execute correctly(excluding <end_of_step>) and print the answer. Avoid undefined variables (NameError),
-          unimported packages, or formatting errors (SyntaxError, TypeError). In the last step of the code, print the final
+          unimported packages, or formatting errors (SyntaxError, TypeError). Explain every variable in each step. In the last step of the code, print the final
           answer. Now! It’s your turn.
 
         The following is a demonstration example:
