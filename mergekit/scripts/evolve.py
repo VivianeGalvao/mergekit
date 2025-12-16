@@ -40,6 +40,17 @@ from mergekit.options import MergeOptions
 
 ray.init(_temp_dir="/tmp/ray")
 
+torch.backends.cuda.enable_mem_efficient_sdp(False)
+torch.backends.cuda.enable_flash_sdp(False)
+
+
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+
 @click.command("mergekit-evolve")
 @click.argument("genome-config-path", type=str)
 @click.option("--max-fevals", type=int, default=100)
@@ -343,7 +354,14 @@ def main(
         return [-x["score"] for x in res]  # maximize
 
     try:
-        cma_opts = {"maxfevals": max_fevals, "timeout": timeout}
+        set_seed(random_seed)
+        transformers.set_seed(random_seed)
+        cma_opts = {
+            "maxfevals": max_fevals,
+            "timeout": timeout,
+            "seed": random_seed,
+            "bounds": [0.01, 1]
+        }
         if force_population_size is not None:
             cma_opts["popsize"] = force_population_size
         xbest, es = cma.fmin2(
