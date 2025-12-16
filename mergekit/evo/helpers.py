@@ -64,7 +64,7 @@ def _eval_model(
     for task in tasks:
         task_name = task.name
         res = evaluate_math_model(
-            merged_path=merged_path
+            merged_path
         )
         results.update(res)
         score+=res[task_name]['score']

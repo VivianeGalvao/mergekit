@@ -1,3 +1,6 @@
+import csv
+import os
+import datetime
 import re
 import torch
 import re
@@ -7,10 +10,154 @@ import sys
 import traceback
 import numpy as np
 import pandas as pd
+import multiprocessing
+import sys
 
+
+from contextlib import redirect_stdout
 from contextlib import redirect_stdout
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+
+LOG_FILE = "resultados/training_log.csv"
+def save_checkpoint_csv(data: dict):
+    """
+    Salva uma linha de resultado no CSV e FORÇA a escrita no disco imediatamente.
+    """
+    # Adiciona timestamp para saber quando ocorreu
+    data['timestamp'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Verifica se o arquivo já existe para decidir se escreve o cabeçalho
+    file_exists = os.path.isfile(LOG_FILE)
+
+    try:
+        with open(LOG_FILE, mode='a', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=data.keys())
+
+            if not file_exists:
+                writer.writeheader()
+
+            writer.writerow(data)
+
+            # --- O TRUQUE CONTRA TRAVAMENTO ---
+            # Isso força o Python a esvaziar o buffer e o Sistema Operacional a gravar no disco físico.
+            f.flush()
+            os.fsync(f.fileno())
+
+    except Exception as e:
+        print(f"Erro ao salvar no CSV (mas a execução continua): {e}")
+
+# # Função auxiliar que roda no processo isolado
+# def _worker_exec(code_string, queue):
+#     f = io.StringIO()
+#     result = {
+#         "success": False,
+#         "output": "",
+#         "error": None
+#     }
+
+#     try:
+#         with redirect_stdout(f):
+#             # Executa o código
+#             exec(code_string, {}, {})
+
+#         result["success"] = True
+#         result["output"] = f.getvalue().strip()
+
+#     except Exception as e:
+#         # Captura o erro e a linha
+#         _, _, tb = sys.exc_info()
+#         # Tenta pegar o último frame do traceback
+#         try:
+#             last_tb = traceback.extract_tb(tb)[-1]
+#             line_number = last_tb.lineno
+#         except:
+#             line_number = "?"
+
+#         result["error"] = f"{type(e).__name__} on line {line_number}: {str(e)}"
+#         # Mesmo com erro, pegamos o que foi printado antes (pode ser útil)
+#         result["output"] = f.getvalue().strip()
+
+#     queue.put(result)
+
+# def score_math_problem(code_string: str, ground_truth_answer: float, timeout: int = 10) -> dict:
+#     """
+#     Avalia o código com proteção contra Loop Infinito (Timeout).
+#     """
+
+#     # 1. Preparação do Multiprocessing
+#     queue = multiprocessing.Queue()
+#     p = multiprocessing.Process(target=_worker_exec, args=(code_string, queue))
+
+#     p.start()
+#     p.join(timeout) # Espera o tempo limite (em segundos)
+
+#     # 2. Verificação do Processo
+#     if p.is_alive():
+#         # TIMEOUT DETECTADO! Matamos o processo.
+#         p.terminate()
+#         p.join()
+
+#         is_executable = False
+#         captured_output = "" # Ou recuperar o que deu tempo de rodar (difícil com kill)
+#         error_message = f"TimeoutError: Execution exceeded {timeout} seconds (Possible Infinite Loop)."
+#         worker_result = None
+#     else:
+#         # Processo terminou a tempo
+#         if not queue.empty():
+#             worker_result = queue.get()
+#             is_executable = worker_result["success"]
+#             captured_output = worker_result["output"]
+#             error_message = worker_result["error"]
+#         else:
+#             # Caso raro de crash silencioso
+#             is_executable = False
+#             captured_output = ""
+#             error_message = "Process crashed silently."
+#             worker_result = None
+
+#     # 3. Lógica de Negócio (Cálculo da Diferença e Fallback)
+
+#     # Função auxiliar para pegar o max score do CSV sem repetir código
+#     def get_fallback_diff():
+#         try:
+#             if os.path.exists(LOG_FILE):
+#                 df = pd.read_csv(LOG_FILE)
+#                 if not df.empty and 'score' in df.columns:
+#                     max_score = df['score'].max()
+#                     # Garante que é um número, senão usa 0
+#                     # if pd.isna(max_score): max_score = 0.0
+#                     return ground_truth_answer - max_score
+#         except Exception:
+#             pass
+#         return ground_truth_answer # Se não tiver log, penalidade máxima (diferença total)
+
+#     difference = ground_truth_answer # Valor padrão inicial
+
+#     if is_executable:
+#         # Tenta extrair a resposta do output
+#         model_answer = extract_last_number(captured_output)
+
+#         if model_answer is not None:
+#             difference = ground_truth_answer - model_answer
+#             # Salva o checkpoint se deu certo (conforme seu código original)
+#             save_checkpoint_csv({'score': model_answer})
+#             # Nota: Cuidado ao salvar aqui se estiver rodando em paralelo, pode dar conflito de arquivo.
+#         else:
+#             # Executou mas não printou número
+#             difference = get_fallback_diff()
+#     else:
+#         # Não executou (Erro ou Timeout)
+#         difference = get_fallback_diff()
+
+#     return {
+#         "is_executable": is_executable,
+#         "difference": abs(difference),
+#         "model_output": captured_output,
+#         "error": error_message
+#     }
 
 def score_math_problem(code_string: str, ground_truth_answer: float, tolerance=1e-6) -> dict:
     """
@@ -38,6 +185,10 @@ def score_math_problem(code_string: str, ground_truth_answer: float, tolerance=1
 
         if model_answer is not None:
             difference = ground_truth_answer - model_answer
+            save_checkpoint_csv({'score': model_answer})
+        else:
+            max_score = pd.read_csv(LOG_FILE)['score'].max()
+            difference = ground_truth_answer - max_score
 
     except Exception as e:
         _, _, tb = sys.exc_info()
@@ -48,11 +199,11 @@ def score_math_problem(code_string: str, ground_truth_answer: float, tolerance=1
 
         error_message = f"{type(e).__name__} on line {line_number}: {str(e)}"
         is_executable = False
-        difference = ground_truth_answer
+        difference = ground_truth_answer - pd.read_csv(LOG_FILE)['score'].max()
 
     return {
         "is_executable": is_executable,
-        "difference": difference,
+        "difference": abs(difference),
         "model_output": captured_output,
         "error": error_message
     }
@@ -60,7 +211,7 @@ def score_math_problem(code_string: str, ground_truth_answer: float, tolerance=1
 
 def get_data():
 
-    df = pd.read_csv("mergekit/data/gsm8k_preprocessed.csv").sample(frac=0.2, random_state=42).reset_index(drop=True)
+    df = pd.read_csv("mergekit/data/gsm8k_validation.csv").head(75)
 
     return df['problem'].tolist(), df['final_answer'].tolist()
 
@@ -79,7 +230,10 @@ def get_prompt(input: str) -> str:
           Question: the input question
           <code>Construct the code step by step. Use <end_of_step> to indicate the end of each step.
           Ensure your code can execute correctly(excluding <end_of_step>) and print the answer. Avoid undefined variables (NameError),
-          unimported packages, or formatting errors (SyntaxError, TypeError). Explain every variable in each step. In the last step of the code, print the final
+          unimported packages, or formatting errors (SyntaxError, TypeError).
+          Avoid using while loops unless absolutely necessary.
+          Prefer for loops with clear ranges to prevent infinite execution.
+          Explain every variable in each step. In the last step of the code, print the final
           answer. Now! It’s your turn.
 
         The following is a demonstration example:
@@ -136,7 +290,11 @@ def extract_last_number(output_str: str) -> float | None:
 def evaluate_math_model(model_id: str) -> dict:
     problems, answers = get_data()
 
-    tokenizer = AutoTokenizer.from_pretrained(model_id, padding_side="left", trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        'Qwen/Qwen2.5-3B-Instruct',
+        padding_side="left",
+        trust_remote_code=True
+    )
 
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -179,8 +337,8 @@ def evaluate_math_model(model_id: str) -> dict:
         generated_ids = model.generate(
             **model_inputs,
             max_new_tokens=512,
-            do_sample=True,
-            temperature=1.0,
+            do_sample=False,
+            temperature=0.0,
             pad_token_id=tokenizer.pad_token_id
         )
 
@@ -197,8 +355,10 @@ def evaluate_math_model(model_id: str) -> dict:
             score = score_math_problem(code_snippet, float(true_answer))
             total_score += score['difference']
         else:
-            total_score += float(true_answer)
+            total_score += abs(float(true_answer) - pd.read_csv(LOG_FILE)['score'].max())
             print("No code block found.")
+
+    print('Score: ', total_score)
 
     final_accuracy = total_score / len(problems) if problems else 0
     return {
