@@ -5,6 +5,7 @@ import importlib.util
 import logging
 import os
 import time
+import json
 from typing import List, Optional
 
 import click
@@ -38,7 +39,7 @@ from mergekit.evo.strategy import (
 from mergekit.merge import run_merge
 from mergekit.options import MergeOptions
 
-ray.init(_temp_dir="/tmp/ray")
+ray.init(_temp_dir="/tmp/ray", ignore_reinit_error=True)
 
 torch.backends.cuda.enable_mem_efficient_sdp(False)
 torch.backends.cuda.enable_flash_sdp(False)
@@ -277,6 +278,8 @@ def main(
     x0 = genome.initial_genotype(random=config.random_init).view(-1).numpy()
     xbest = x0
     xbest_cost = np.inf
+    xbest_cv = xbest
+    xbest_cv_cost = xbest_cost
 
     def progress_callback(es: cma.CMAEvolutionStrategy):
         nonlocal xbest, xbest_cost
@@ -314,6 +317,23 @@ def main(
     def parallel_evaluate(x: List[np.ndarray]) -> List[float]:
         print(f"Received {len(x)} genotypes")
         res = strat.evaluate_genotypes(x)
+
+        score_test = [-x["score_test"] for x in res]
+        ibest = np.argmin(score_test)
+
+        nonlocal xbest_cv, xbest_cv_cost
+
+        if score_test[ibest] < xbest_cv_cost:
+            xbest_cv_cost = score_test[ibest]
+            xbest_cv = x[ibest]
+            # save the best merge configuration using original model references
+            genome_pretty = ModelGenome(config.genome, trust_remote_code=trust_remote_code)
+            best_config = genome_pretty.genotype_merge_config(xbest_cv)
+            print("Best (test) merge configuration:")
+            print(best_config.to_yaml())
+            if save_final_model:
+                print("Saving new_test model...")
+                run_merge(best_config, os.path.join(storage_path, "best_test_model"), merge_options)
 
         if use_wandb:
             res = list(res)
@@ -364,6 +384,7 @@ def main(
         }
         if force_population_size is not None:
             cma_opts["popsize"] = force_population_size
+        start_time = time.time()
         xbest, es = cma.fmin2(
             None,
             parallel_objective=parallel_evaluate,
@@ -372,8 +393,11 @@ def main(
             options=cma_opts,
             callback=progress_callback,
         )
+        end_time = time.time()
         xbest_cost = es.result.fbest
+        total_time = end_time - start_time
     except KeyboardInterrupt:
+        total = time.time() - start_time
         ray.shutdown()
 
     print("!!! OPTIMIZATION COMPLETE !!!")
@@ -388,6 +412,16 @@ def main(
     best_config = genome_pretty.genotype_merge_config(xbest)
     print("Best merge configuration:")
     print(best_config.to_yaml())
+
+    # save execution     
+    output = {}
+    output['total_time'] = total_time
+    output['best_cost'] = xbest_cost
+    output['seed'] = random_seed
+    output['dimension'] = len(xbest)
+
+    with open(f'{storage_path}/execution_time.json', 'w') as file:
+        json.dump(output, file)
 
     if save_final_model:
         print("Saving final model...")

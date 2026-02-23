@@ -60,6 +60,7 @@ def _eval_model(
 
     results = {}
     score = 0
+    score_test = 0
 
     for task in tasks:
         task_name = task.name
@@ -68,8 +69,9 @@ def _eval_model(
         )
         results.update(res)
         score+=res[task_name]['score']
+        score_test+=res[task_name]['test_score']
 
-    return {"score": score, "results": results}
+    return {"score": score, "score_test": score_test, "results": results}
 
 
 def evaluate_model(
@@ -114,7 +116,7 @@ def evaluate_model(
         shutil.rmtree(merged_path)
 
 
-evaluate_model_ray = ray.remote(num_cpus=1, num_gpus=1.0)(evaluate_model)
+evaluate_model_ray = ray.remote(num_cpus=1, num_gpus=0.1)(evaluate_model)
 
 
 def merge_model(
@@ -137,7 +139,7 @@ def merge_model(
 
 merge_model_ray = ray.remote(
     num_cpus=1,
-    num_gpus=1,
+    num_gpus=0.3,
     max_retries=3,
     retry_exceptions=[ConnectionError],
 )(merge_model)

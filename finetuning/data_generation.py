@@ -5,50 +5,64 @@ import re
 import torch
 import re
 import io
+import math
 import sys
 import traceback
+import transformers
+import numpy as np
 import pandas as pd
-import sys
 from tqdm import tqdm
 
+import torch
 
-from contextlib import redirect_stdout
 from contextlib import redirect_stdout
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from func_timeout import func_timeout, FunctionTimedOut
 
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
-max_score = 10e9
 TIME_LIMIT = 10
 
-LOG_FILE = "resultados/training_log.csv"
-def save_checkpoint_csv(data: dict):
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+
+def get_data():
+
+    df = pd.read_csv("mergekit/data/gsm8k_validation.csv").iloc[128:]
+
+    return df['problem'].tolist(), df['final_answer'].tolist()
+
+
+def extract_code(code: str) -> str:
+
+    match = re.search(r"<code>(.*?)<end_of_code>", code, re.DOTALL)
+
+    if match:
+        extracted_code = match.group(1)
+
+        cleaned_code = extracted_code.replace("<end_of_step>", "")
+
+        final_code = cleaned_code.strip()
+
+        return final_code
+    else:
+        return None
+
+def extract_last_number(output_str: str) -> float | None:
     """
-    Salva uma linha de resultado no CSV e FORÇA a escrita no disco imediatamente.
+    Encontra o último número (inteiro ou float) na string de saída.
+    Isso ajuda a ignorar texto extra que o modelo possa ter printado.
     """
-    # Adiciona timestamp para saber quando ocorreu
-    data['timestamp'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Verifica se o arquivo já existe para decidir se escreve o cabeçalho
-    file_exists = os.path.isfile(LOG_FILE)
-
-    try:
-        with open(LOG_FILE, mode='a', newline='', encoding='utf-8') as f:
-            writer = csv.DictWriter(f, fieldnames=data.keys())
-
-            if not file_exists:
-                writer.writeheader()
-
-            writer.writerow(data)
-
-            # --- O TRUQUE CONTRA TRAVAMENTO ---
-            # Isso força o Python a esvaziar o buffer e o Sistema Operacional a gravar no disco físico.
-            f.flush()
-            os.fsync(f.fileno())
-
-    except Exception as e:
-        print(f"Erro ao salvar no CSV (mas a execução continua): {e}")
+    matches = re.findall(r"[-+]?\d*\.\d+|\d+", output_str)
+    if matches:
+        try:
+            return float(matches[-1])
+        except ValueError:
+            return None
+    return None
 
 
 def score_math_problem(code_string: str, ground_truth_answer: float, tolerance=1e-6) -> dict:
@@ -61,7 +75,7 @@ def score_math_problem(code_string: str, ground_truth_answer: float, tolerance=1
     """
 
     is_executable = False
-    difference = ground_truth_answer
+    difference = None
     captured_output = ""
     error_message = None
 
@@ -74,16 +88,8 @@ def score_math_problem(code_string: str, ground_truth_answer: float, tolerance=1
         captured_output = f.getvalue().strip()
 
         model_answer = extract_last_number(captured_output)
-
         if model_answer is not None:
             difference = abs(ground_truth_answer - model_answer)
-            # save_checkpoint_csv({'score': model_answer})
-        else:
-            #try:
-            #    max_score = pd.read_csv(LOG_FILE)['score'].max()
-            #except FileNotFoundError as e:
-            #    max_score = 0
-            difference = abs(ground_truth_answer - max_score) + 1
 
     except Exception as e:
         _, _, tb = sys.exc_info()
@@ -94,28 +100,14 @@ def score_math_problem(code_string: str, ground_truth_answer: float, tolerance=1
 
         error_message = f"{type(e).__name__} on line {line_number}: {str(e)}"
         is_executable = False
-        #try:
-        #    max_score = pd.read_csv(LOG_FILE)['score'].max()
-        #except FileNotFoundError as e:
-        #    max_score = 0
-        difference = abs(ground_truth_answer - max_score) + 1
 
     return {
         "is_executable": is_executable,
         "difference": difference,
         "model_output": captured_output,
+        "model_answer": model_answer,
         "error": error_message
     }
-
-
-def get_data(partition):
-
-    if partition == 'train':
-        df = pd.read_csv("mergekit/data/gsm8k_validation.csv").head(128)
-    else:
-        df = pd.read_csv("mergekit/data/gsm8k_validation.csv").tail(128)
-
-    return df['problem'].tolist(), df['final_answer'].tolist()
 
 
 def get_prompt(input: str) -> str:
@@ -159,38 +151,6 @@ def get_prompt(input: str) -> str:
         <code>
     """
     return prompt
-
-
-def extract_code(code: str) -> str:
-
-    match = re.search(r"<code>(.*?)<end_of_code>", code, re.DOTALL)
-
-    if match:
-        extracted_code = match.group(1)
-
-        cleaned_code = extracted_code.replace("<end_of_step>", "")
-
-        final_code = cleaned_code.strip()
-
-        return final_code
-    else:
-        return None
-
-
-def extract_last_number(output_str: str) -> float | None:
-    """
-    Encontra o último número (inteiro ou float) na string de saída.
-    Isso ajuda a ignorar texto extra que o modelo possa ter printado.
-    """
-
-    matches = re.findall(r"[-+]?\d*\.\d+|\d+", output_str)
-    if matches:
-        try:
-            return float(matches[-1])
-        except ValueError:
-            return None
-    return None
-
 
 def generate_in_batches(problems, model, tokenizer, batch_size=16):
     all_results = []
@@ -261,9 +221,10 @@ def generate_in_batches(problems, model, tokenizer, batch_size=16):
 
     return all_results
 
+def generate_math_model(model_id: str) -> dict:
 
-def evaluate(model_id: str, partition='train') -> dict:
-    problems, answers = get_data(partition)
+    problems, answers = get_data()
+    print('Tamanho da base: ', len(problems))
 
     tokenizer = AutoTokenizer.from_pretrained(
         'Qwen/Qwen2.5-3B-Instruct',
@@ -285,46 +246,57 @@ def evaluate(model_id: str, partition='train') -> dict:
         problems,
         model,
         tokenizer,
-        batch_size=32
+        batch_size=660
     )
 
-    total_score = 0
-    for _, (full_text, true_answer) in enumerate(zip(decoded_texts, answers)):
+    dataset_rows = []
+    for reasoning, prob, true_answer in zip(decoded_texts, problems, answers):
 
-        code_snippet = extract_code(full_text)
+        code_snippet = extract_code(reasoning)
+
+        exec_output = ""
+        is_correct = False
 
         if code_snippet:
             try:
-                score = func_timeout(TIME_LIMIT, score_math_problem, args=(code_snippet, float(true_answer)))
-                total_score += score['difference']
+                res = func_timeout(TIME_LIMIT, score_math_problem, args=(code_snippet, float(true_answer)))
+                if res['difference'] < 10e-6:
+                    is_correct = True
+                exec_output = res['model_output']
 
             except FunctionTimedOut:
                 print(f"Time limit exceeded ({TIME_LIMIT}s). Applying penalty.")
-                total_score += abs(float(true_answer) - max_score) + 1
 
             except Exception as e:
                 print(f"Code execution error: {e}")
-                total_score += abs(float(true_answer) - max_score) + 1
         else:
-            total_score += abs(float(true_answer) - max_score) + 1
             print("No code block found.")
 
-    print('Score: ', total_score)
-    final_accuracy = total_score / len(problems) if problems else 0
-    return {
-        'score': -total_score,
-        'accuracy': final_accuracy
+        dataset_rows.append({
+            "problem": prob,
+            "answer": true_answer,
+            "reasoning": reasoning,
+            "executed_answer": exec_output,
+            "is_correct": is_correct,
+            "code_snippet": code_snippet
+        })
+
+    return dataset_rows
+
+
+if __name__ == "__main__":
+
+    models = {
+        # "merged_qwen": "/home/viviane/resultados/cmaes_merged/merge_3/final_model",
+        "qwen_3b": "Qwen/Qwen2.5-3B-Instruct"
     }
 
+    for model in models:
+        generations = generate_math_model(
+            model_id=models[model]
+        )
 
-def evaluate_math_model(model_id: str) -> dict:
+        df_result = pd.DataFrame(generations)
+        df_result.to_csv(f"mergekit/data/gsm8k_full_generation_log_{model}.csv", index=False)
 
-    train_res = evaluate(model_id, partition='train')
-    test_res = evaluate(model_id, partition='test')
-
-    return {
-        'reasoning_python': {
-            'score': train_res['score'],
-            'test_score': test_res['score'],
-        }
-    }
+        print(f"Log completo salvo em 'gsm8k_full_generation_log_{model}.csv' com {len(df_result)} linhas.")
